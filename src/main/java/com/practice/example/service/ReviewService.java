@@ -1,56 +1,85 @@
 package com.practice.example.service;
 
-import com.practice.example.model.ReviewDetails;
-import com.practice.example.model.ReviewRating;
-import com.practice.example.model.ReviewReactions;
+import com.practice.example.dto.CreateReviewRequest;
+import com.practice.example.model.Review;
+import com.practice.example.repository.ReviewRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.NoSuchElementException;
+import java.util.UUID;
 
 @Service
 public class ReviewService {
-    private final Map<UUID, ReviewDetails> storage = new ConcurrentHashMap<>();
 
-    public ReviewDetails createReview(UUID authorId,
-                                      UUID organizationId,
-                                      String title,
-                                      String content,
-                                      UUID parentReviewId,
-                                      int ratingValue) {
-        UUID newId = UUID.randomUUID();
-        ReviewRating rating = new ReviewRating(ratingValue);
-        Instant now = Instant.now();
-        ReviewDetails details = new ReviewDetails(
-                newId,
-                authorId,
-                organizationId,
-                title,
-                content,
-                parentReviewId == null ? Optional.empty() : Optional.of(parentReviewId),
-                now,
-                rating
-        );
-        storage.put(newId, details);
-        return details;
+    private final ReviewRepository reviewRepository;
+
+    public ReviewService(ReviewRepository reviewRepository) {
+        this.reviewRepository = reviewRepository;
     }
 
-    public ReviewDetails addReaction(UUID reviewId, String reactionTypeStr) {
-        ReviewDetails details = storage.get(reviewId);
-        if (details == null) {
+    @Transactional
+    public Review createReview(UUID authorId,
+                               UUID organizationId,
+                               String title,
+                               String content,
+                               UUID parentReviewId,
+                               int ratingValue) {
+        UUID newId = UUID.randomUUID();
+        Review parent = null;
+        if (parentReviewId != null) {
+            parent = reviewRepository.findById(parentReviewId)
+                    .orElseThrow(() -> new NoSuchElementException("Parent review not found: " + parentReviewId));
+        }
+
+        Review review = Review.builder()
+                .id(newId)
+                .authorId(authorId)
+                .organizationId(organizationId)
+                .title(title)
+                .content(content)
+                .parentReview(parent)
+                .publishedAt(Instant.now())
+                .ratingValue(ratingValue)
+                .likeCount(0)
+                .dislikeCount(0)
+                .build();
+
+        return reviewRepository.save(review);
+    }
+
+    @Transactional
+    public Review addReaction(UUID reviewId, String reactionTypeStr) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new NoSuchElementException("Review not found: " + reviewId));
+
+        // Можно добавить поддержку других типов реакций, здесь оставляем только LIKE/DISLIKE
+        switch (reactionTypeStr.toUpperCase()) {
+            case "LIKE":
+                review.setLikeCount(review.getLikeCount() + 1);
+                break;
+            case "DISLIKE":
+                review.setDislikeCount(review.getDislikeCount() + 1);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown reaction: " + reactionTypeStr);
+        }
+
+        return reviewRepository.save(review);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Review> getAllReviews() {
+        return reviewRepository.findAll();
+    }
+
+    @Transactional
+    public void deleteReview(UUID reviewId) {
+        if (!reviewRepository.existsById(reviewId)) {
             throw new NoSuchElementException("Review not found: " + reviewId);
         }
-        ReviewReactions reaction = ReviewReactions.fromString(reactionTypeStr);
-        details.addReaction(reaction);
-        return details;
-    }
-
-    public Collection<ReviewDetails> getAllReviews() {
-        return storage.values();
-    }
-
-    public void deleteReview(UUID reviewId) {
-        storage.remove(reviewId);
+        reviewRepository.deleteById(reviewId);
     }
 }

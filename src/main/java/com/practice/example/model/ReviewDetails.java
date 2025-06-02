@@ -17,7 +17,7 @@ public class ReviewDetails {
     private final UUID organizationId;
     private final String title;
     private final String content;
-    private final Map<ReviewReactions, Integer> reactions = new EnumMap<>(ReviewReactions.class);
+    private final Map<ReviewReactions.Type, Integer> reactions = new EnumMap<>(ReviewReactions.Type.class);
     private final Optional<UUID> parentReviewId;
     private final Instant publishedAt;
     private ReviewRating rating;
@@ -38,11 +38,11 @@ public class ReviewDetails {
         this.parentReviewId = parentReviewId;
         this.publishedAt = publishedAt;
         this.rating = rating;
-        reactions.put(ReviewReactions.like(), 0);
-        reactions.put(ReviewReactions.dislike(), 0);
+        reactions.put(ReviewReactions.Type.LIKE, 0);
+        reactions.put(ReviewReactions.Type.DISLIKE, 0);
     }
 
-    public synchronized void addReaction(ReviewReactions reactionType) {
+    public synchronized void addReaction(ReviewReactions.Type reactionType) {
         reactions.merge(reactionType, 1, Integer::sum);
     }
 

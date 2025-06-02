@@ -2,21 +2,21 @@ package com.practice.example.controller;
 
 import com.practice.example.dto.AddReactionRequest;
 import com.practice.example.dto.CreateReviewRequest;
-import com.practice.example.model.ReviewDetails;
+import com.practice.example.model.Review;
 import com.practice.example.service.ReviewService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collection;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-
 
 @RestController
 @RequestMapping("/reviews")
 @Validated
 public class ReviewController {
+
     private final ReviewService reviewService;
 
     public ReviewController(ReviewService reviewService) {
@@ -24,8 +24,8 @@ public class ReviewController {
     }
 
     @PostMapping
-    public ResponseEntity<ReviewDetails> createReview(@RequestBody CreateReviewRequest request) {
-        ReviewDetails created = reviewService.createReview(
+    public ResponseEntity<Review> createReview(@RequestBody CreateReviewRequest request) {
+        Review created = reviewService.createReview(
                 request.getAuthorId(),
                 request.getOrganizationId(),
                 request.getTitle(),
@@ -37,24 +37,28 @@ public class ReviewController {
     }
 
     @PostMapping("/{id}/reply")
-    public ResponseEntity<ReviewDetails> replyToReview(@PathVariable("id") UUID reviewId,
-                                                       @RequestBody CreateReviewRequest request) {
-        ReviewDetails reply = reviewService.createReview(
-                request.getAuthorId(),
-                request.getOrganizationId(),
-                request.getTitle(),
-                request.getContent(),
-                reviewId,
-                request.getRatingValue()
-        );
-        return ResponseEntity.ok(reply);
+    public ResponseEntity<Review> replyToReview(@PathVariable("id") UUID reviewId,
+                                                @RequestBody CreateReviewRequest request) {
+        try {
+            Review reply = reviewService.createReview(
+                    request.getAuthorId(),
+                    request.getOrganizationId(),
+                    request.getTitle(),
+                    request.getContent(),
+                    reviewId,
+                    request.getRatingValue()
+            );
+            return ResponseEntity.ok(reply);
+        } catch (NoSuchElementException ex) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PostMapping("/{id}/reactions")
-    public ResponseEntity<ReviewDetails> addReaction(@PathVariable("id") UUID reviewId,
-                                                     @RequestBody AddReactionRequest request) {
+    public ResponseEntity<Review> addReaction(@PathVariable("id") UUID reviewId,
+                                              @RequestBody AddReactionRequest request) {
         try {
-            ReviewDetails updated = reviewService.addReaction(reviewId, request.getReactionType());
+            Review updated = reviewService.addReaction(reviewId, request.getReactionType());
             return ResponseEntity.ok(updated);
         } catch (NoSuchElementException ex) {
             return ResponseEntity.notFound().build();
@@ -64,7 +68,7 @@ public class ReviewController {
     }
 
     @GetMapping
-    public ResponseEntity<Collection<ReviewDetails>> getAllReviews() {
+    public ResponseEntity<List<Review>> getAllReviews() {
         return ResponseEntity.ok(reviewService.getAllReviews());
     }
 
@@ -73,7 +77,7 @@ public class ReviewController {
         try {
             reviewService.deleteReview(reviewId);
             return ResponseEntity.noContent().build();
-        } catch (Exception ex) {
+        } catch (NoSuchElementException ex) {
             return ResponseEntity.notFound().build();
         }
     }
