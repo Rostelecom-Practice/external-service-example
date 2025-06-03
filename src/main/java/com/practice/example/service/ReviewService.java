@@ -1,8 +1,10 @@
 package com.practice.example.service;
 
 import com.practice.example.dto.CreateReviewRequest;
+import com.practice.example.infra.kafka.ReviewKafkaProducer;
 import com.practice.example.model.Review;
 import com.practice.example.repository.ReviewRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,13 +14,14 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
 
-    public ReviewService(ReviewRepository reviewRepository) {
-        this.reviewRepository = reviewRepository;
-    }
+    private final ReviewDetailsProvider reviewDetailsProvider;
+
+    private final ReviewKafkaProducer reviewKafkaProducer;
 
     @Transactional
     public Review createReview(UUID authorId,
@@ -47,6 +50,7 @@ public class ReviewService {
                 .dislikeCount(0)
                 .build();
 
+        reviewKafkaProducer.sendReviewPublished(reviewDetailsProvider.getDetailsTo(review));
         return reviewRepository.save(review);
     }
 

@@ -1,6 +1,8 @@
 package com.practice.example.service;
 
+import com.practice.example.infra.kafka.ReviewKafkaProducer;
 import com.practice.example.model.Review;
+import com.practice.example.model.ReviewDetails;
 import com.practice.example.repository.ReviewRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,11 +22,15 @@ class ReviewServiceTest {
 
     private ReviewRepository reviewRepository;
     private ReviewService reviewService;
+    private ReviewDetailsProvider reviewDetailsProvider;
+    private ReviewKafkaProducer reviewKafkaProducer;
 
     @BeforeEach
     void setUp() {
         reviewRepository = Mockito.mock(ReviewRepository.class);
-        reviewService = new ReviewService(reviewRepository);
+        reviewDetailsProvider = Mockito.mock(ReviewDetailsProvider.class);
+        reviewKafkaProducer = Mockito.mock(ReviewKafkaProducer.class);
+        reviewService = new ReviewService(reviewRepository, reviewDetailsProvider, reviewKafkaProducer);
     }
 
     @Test
@@ -37,6 +43,8 @@ class ReviewServiceTest {
         when(reviewRepository.save(any(Review.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
+
+
         Review saved = reviewService.createReview(
                 authorId,
                 orgId,
@@ -45,6 +53,13 @@ class ReviewServiceTest {
                 null,
                 ratingValue
         );
+
+        ReviewDetails newReviewDetails = new ReviewDetails(saved.getId(), authorId, orgId, title, content,
+                Optional.empty(),
+                saved.getPublishedAt());
+
+        when(reviewDetailsProvider.getDetailsTo(saved))
+                .thenReturn(newReviewDetails);
 
         assertThat(saved.getAuthorId()).isEqualTo(authorId);
         assertThat(saved.getOrganizationId()).isEqualTo(orgId);
@@ -55,7 +70,9 @@ class ReviewServiceTest {
         assertThat(saved.getDislikeCount()).isZero();
         assertThat(saved.getPublishedAt()).isNotNull();
 
-        verify(reviewRepository, times(1)).save(any(Review.class));
+        verify(reviewRepository, times(1)).save(saved);
+        verify(reviewDetailsProvider, times(1)).getDetailsTo(saved);
+        verify(reviewKafkaProducer, times(1)).sendReviewPublished(any());
     }
 
     @Test
@@ -135,6 +152,7 @@ class ReviewServiceTest {
         assertThat(updated.getLikeCount()).isEqualTo(1);
         assertThat(updated.getDislikeCount()).isZero();
         verify(reviewRepository, times(1)).save(updated);
+        verify(reviewKafkaProducer, never()).sendReviewPublished(any());
     }
 
     @Test

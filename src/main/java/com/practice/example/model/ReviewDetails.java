@@ -1,5 +1,6 @@
 package com.practice.example.model;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -11,6 +12,7 @@ import java.util.UUID;
 
 @RequiredArgsConstructor
 @Getter
+@Builder
 public class ReviewDetails {
     private final UUID id;
     private final UUID authorId;
@@ -46,7 +48,13 @@ public class ReviewDetails {
         reactions.merge(reactionType, 1, Integer::sum);
     }
 
+    public synchronized void addReaction(ReviewReactions.Type reactionType, int amount) {
+        reactions.merge(reactionType, amount, Integer::sum);
+    }
+
     public synchronized void setRating(ReviewRating newRating) {
         this.rating = newRating;
     }
+
+
 }
